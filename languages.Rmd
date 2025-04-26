@@ -50,6 +50,12 @@ tulos<-dplyr::left_join(tulos, qt,by = 'Year')
 tulos_frak <- tulos  %>%
   dplyr::mutate (koko = case_when(`Population 31 Dec` < quant95 ~ 0,
                                   `Population 31 Dec` >= quant95 ~ 1))
+tulos_highlighted <- tulos %>%
+  mutate(
+    highlight = ifelse(Rank <= 15, TRUE, FALSE)
+  )
+
+
 # tulos_frak<-tulos_frak %>% 
 #   dplyr::select(Rank, everything())
 ```
@@ -75,7 +81,8 @@ $Background, quantile: White \lt 95, Black \ge 95$
 
 
 DT::datatable(
-    tulos_frak,
+    # tulos_frak,
+    tulos_highlighted,
     rownames = FALSE,  # rivinimet on usein 1 ... N
     caption = "Lanuages in Finland",
     filter = list(position = 'top'),  # Sarake kohtainen haku
@@ -98,7 +105,8 @@ DT::datatable(
       # language = list(url = "//cdn.datatables.net/plug-ins/1.10.20/i18n/Finnish.json")
     )) %>% 
   formatStyle(
-  'koko',
+  # 'koko',
+    'highlight',
    target = 'row',
   color =  styleEqual(c(0, 1), c('black', '#FE221B')),
   backgroundColor = styleEqual(c(0, 1), c('white', 'black') )
@@ -116,7 +124,7 @@ DT::datatable(
 ```{r graph path data preparation, echo=FALSE,warning=FALSE}
 # knitr::knit2html('languages.Rmd', stylesheet = 'flat-table.css')
 # start <- 1990
-start <- 2023
+start <- 2014
 end <- 2024
 rank <- 15
 
