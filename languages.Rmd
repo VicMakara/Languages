@@ -60,7 +60,9 @@ tulos_highlighted <- tulos %>%
 #   dplyr::select(Rank, everything())
 ```
 
-$Background, quantile: White \lt 95, Black \ge 95$
+**Background:**  
+Top 15 languages (by population) → **black background** with **yellow text**.  
+Other languages → **white background** with **black text**.
 
 ```{r datatable, echo=FALSE,warning=FALSE}
 # knitr::kable(tulos,caption='Tekninen data' )
@@ -108,7 +110,7 @@ DT::datatable(
   # 'koko',
     'highlight',
    target = 'row',
-  color =  styleEqual(c(0, 1), c('black', '#FE221B')),
+  color =  styleEqual(c(0, 1), c('black', 'yellow')),
   backgroundColor = styleEqual(c(0, 1), c('white', 'black') )
 )
   # %>% 
