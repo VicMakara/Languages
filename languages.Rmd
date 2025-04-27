@@ -123,167 +123,163 @@ DT::datatable(
 # read_tsv(readClipboard(),skip=4)
 # selection<-read_tsv(readClipboard(),skip=4)
 ```
-```{r graph path data preparation, echo=FALSE,warning=FALSE}
+```{r graph_path, echo=FALSE, warning=FALSE, fig.dim = c(15, 15)}
 # knitr::knit2html('languages.Rmd', stylesheet = 'flat-table.css')
 # start <- 1990
-start <- 2014
-end <- 2024
-rank <- 15
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(stringr)
+library(kableExtra)
+library(ggplot2)
+library(scales)
 
-language_start <- tulos %>% 
-  ungroup () %>% 
-  filter (Year ==start & Rank <= rank) %>% 
-  select(2)
+analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, font_scale = 1) {
+  library(dplyr)
+  library(forcats)
+  library(stringr)
+  library(kableExtra)
+  library(ggplot2)
 
-language_start_list <- language_start$Language
+  # Определяем топ-языки по началу и концу периода
+  language_start <- tulos %>% 
+    ungroup() %>% 
+    filter(Year == start_year & Rank <= rank_limit) %>% 
+    select(Language)
 
-language_end <- tulos %>% 
-  filter (Year == end & Rank <= rank) %>% 
-  ungroup () %>% 
-  select(2)
+  language_end <- tulos %>% 
+    ungroup() %>% 
+    filter(Year == end_year & Rank <= rank_limit) %>% 
+    select(Language)
 
-languages_most <- unique(dplyr::bind_rows(language_start,language_end))
-data_most <- tulos %>% 
-             select (Year, Language, `Population 31 Dec`, Rank) %>% 
-             filter(Language %in% pull(languages_most) & Year %in% c(start,end)) %>% 
-             arrange (Year) %>% 
-             mutate(Language =fct_reorder((stringr::str_remove(Language,"(\\,|\\;)\\s+\\w+")),
-                                          `Population 31 Dec`,
-                                          max),
-                    pop_label = 1000*round(`Population 31 Dec`/1000,1)
-                    # lab_lang = ifelse(Year == end,  Language, NA), 
-             ) %>% arrange (Year, desc(Rank))
-# data_most <- data_most %>% 
-#              filter(`Population 31 Dec` >= 1000 )  
-number_lang <-length(languages_most %>% pull)
-table <- 
-  data_most %>% 
-  select(-pop_label) %>% 
-  rename(Population = `Population 31 Dec`) %>% 
-  tidyr::pivot_wider(
-     names_from = c(Year),
-     values_from = c(Rank,Population)
-  ) %>% 
-  # mutate(Change_rank = Rank_1990 -Rank_2021, Change_pop = Population_2021 - Population_1990) %>% 
-    mutate(`Change in rank` = .[[2]] -.[[3]], `Change in pop` = .[[5]] - .[[4]]) %>% 
-  arrange(.[[3]])
+  languages_most <- unique(bind_rows(language_start, language_end))
 
-ukr <- which(table$Language ==  "Ukrainian") #-- select row by Ukrainian, because it'd impossible later
+  # Данные для таблицы и графика
+  data_most <- tulos %>% 
+    select(Year, Language, `Population 31 Dec`, Rank) %>% 
+    filter(Language %in% pull(languages_most) & Year %in% c(start_year, end_year)) %>% 
+    arrange(Year) %>% 
+    mutate(Language = fct_reorder(stringr::str_remove(Language, "(,|;)\\s+\\w+"),
+                                  `Population 31 Dec`, max),
+           pop_label = 1000 * round(`Population 31 Dec`/1000, 1)) %>% 
+    arrange(Year, desc(Rank))
 
-table$`Change in rank` = cell_spec(table$`Change in rank`, color = ifelse(table$`Change in rank` >= 0, "blue", "red")) 
-# table$Language = cell_spec(table$Language, color = ifelse(table$Language == "Ukrainian", "orange", "green"))
+  # Формируем таблицу
+  table <- data_most %>% 
+    select(-pop_label) %>% 
+    rename(Population = `Population 31 Dec`) %>% 
+    tidyr::pivot_wider(
+      names_from = Year,
+      values_from = c(Rank, Population)
+    ) %>% 
+    mutate(`Change in rank` = .[[2]] - .[[3]],
+           `Change in pop` = .[[5]] - .[[4]]) %>% 
+    arrange(.[[3]])
 
+  # Выделяем строку Ukrainian для особого оформления
+  ukr <- which(table$Language == "Ukrainian")
 
-kbl(
-  table, escape = F,
-  "html",
-  col.names = gsub("[_]", " ", names(table)),
-  caption = paste(
-    "The most spoken languages in years",
-    start,
-    "and",
-    end,
-    "by rank in",
-    end
-  ),
-  format.args = list(big.mark = " ")
-) %>%
-  kable_classic_2 ("striped", full_width = T) %>% 
-   row_spec(0, bold = T, color = "white",italic = TRUE, background = "#D7261E")  %>% 
-   column_spec (1, bold = T, color = "white", background = "#D7261E") %>% 
-   row_spec(ukr, bold = T, italic = TRUE, angle = -10, color = "#210236", background = "#c6f7e5") %>% 
-   kable_styling(bootstrap_options = c("striped", "hover"))
-
-   # %>%  
-   #   kable_classic() kable_material_dark()
-
-```
-```{r graph path, echo=FALSE,warning=FALSE, fig.dim = c(15, 15) }
-
-# Add a column for growth status
-arrow_data <- data_most %>%
-  group_by(Language) %>%
-  summarize(
-    start_year = min(Year),
-    end_year = max(Year),
-    start_pop = `Population 31 Dec`[Year == min(Year)],
-    end_pop = `Population 31 Dec`[Year == max(Year)]
+  # Оформление таблицы
+  table_html <- kbl(
+    table, escape = FALSE, format = "html",
+    col.names = gsub("_", " ", names(table)),
+    caption = paste("The most spoken languages in years", start_year, "and", end_year, "by rank in", end_year),
+    format.args = list(big.mark = " ")
   ) %>%
-  mutate(
-    pop_diff = end_pop - start_pop,
-    label = paste0("Δ", pop_diff),  # Difference label
-    growth_status = ifelse(end_pop > start_pop, "Growing", "Decreasing"),  # Growth status
-    start_pop_zero = 0,  # All arrows start at zero
-    end_pop_adjusted = end_pop - start_pop  # Adjust end_pop relative to start_pop
-  )
+    kable_classic_2("striped", full_width = TRUE) %>%
+    row_spec(0, bold = TRUE, color = "white", italic = TRUE, background = "#D7261E") %>%
+    column_spec(1, bold = TRUE, color = "white", background = "#D7261E") %>%
+    row_spec(ukr, bold = TRUE, italic = TRUE, angle = -10, color = "#210236", background = "#c6f7e5") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"))
 
-# Extract start and end years dynamically from the data
-start_year <- min(arrow_data$start_year)
-end_year <- max(arrow_data$end_year)
+  # Подготовка данных для графика
+  arrow_data <- data_most %>%
+    group_by(Language) %>%
+    summarize(
+      start_year = min(Year),
+      end_year = max(Year),
+      start_pop = `Population 31 Dec`[Year == min(Year)],
+      end_pop = `Population 31 Dec`[Year == max(Year)]
+    ) %>%
+    mutate(
+      pop_diff = end_pop - start_pop,
+      label = paste0("\u0394", pop_diff),
+      growth_status = ifelse(end_pop > start_pop, "Growing", "Decreasing"),
+      start_pop_zero = 0,
+      end_pop_adjusted = end_pop - start_pop
+    )
 
-# Create the plot
-ggplot(arrow_data) +
-  geom_segment(
-    aes(
-      x = start_pop_zero, xend = end_pop_adjusted,
-      y = reorder(Language, pop_diff), yend = reorder(Language, pop_diff),
-      color = growth_status  # Set color based on growth status
-    ),
-    arrow = arrow(length = unit(3, "mm"), type = "closed"),
-    size = 1
-  ) +
-  geom_text(
-    aes(
-      x = (start_pop_zero + end_pop_adjusted) / 2,
-      y = reorder(Language, pop_diff),
-      label = label
-    ),
-    vjust = -0.5,
-    size = 5,
-    family = "Bookman",
-    color = "blue"
-  ) +
-  geom_text(
-    aes(
-      x = start_pop_zero,
-      y = reorder(Language, pop_diff),
-      label = start_pop
-    ),
-    vjust = 1.5,
-    size = 3.5,
-    family = "Bookman",
-    color = "springgreen4"
-  ) +
-  geom_text(
-    aes(
-      x = end_pop_adjusted,
-      y = reorder(Language, pop_diff),
-      label = end_pop
-    ),
-    vjust = -1.7,  # Position above the line
-    hjust = 0,
-    size = 3.5,
-    family = "Bookman",
-    color = "orangered3"
-  ) +
-  labs(
-    title = paste("Population Changes Between", start_year, "and", end_year),
-    x = "Population",
-    y = "Language",
-    color = "Growth Status"  # Legend title
-  ) +
-  scale_color_manual(
-    values = c("Growing" = "seagreen", "Decreasing" = "tomato3")  # Customize colors
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_blank(),  # Remove x-axis number labels
-    axis.text.y = element_text(size = 14, color = "darkgreen"),
-    axis.title.x = element_text(size = 16, color = "purple"),
-    axis.title.y = element_text(size = 16, color = "brown"),
-    legend.title = element_text(size = 14),
-    legend.text = element_text(size = 12)
-  )
+  # График
+  plot <- ggplot(arrow_data) +
+    geom_segment(
+      aes(
+        x = start_pop_zero, xend = end_pop_adjusted,
+        y = reorder(Language, pop_diff), yend = reorder(Language, pop_diff),
+        color = growth_status
+      ),
+      arrow = arrow(length = unit(3, "mm"), type = "closed"),
+      size = 1
+    ) +
+    geom_text(
+      aes(
+        x = (start_pop_zero + end_pop_adjusted) / 2,
+        y = reorder(Language, pop_diff),
+        label = label
+      ),
+      vjust = -0.5,
+      size = 5 * font_scale,
+      family = "Bookman",
+      color = "blue"
+    ) +
+    geom_text(
+      aes(
+        x = start_pop_zero,
+        y = reorder(Language, pop_diff),
+        label = start_pop
+      ),
+      vjust = 1.5,
+      size = 3.5 * font_scale,
+      family = "Bookman",
+      color = "springgreen4"
+    ) +
+    geom_text(
+      aes(
+        x = end_pop_adjusted,
+        y = reorder(Language, pop_diff),
+        label = end_pop
+      ),
+      vjust = -1.7,
+      hjust = 0,
+      size = 3.5 * font_scale,
+      family = "Bookman",
+      color = "orangered3"
+    ) +
+    labs(
+      title = paste("Population Changes Between", start_year, "and", end_year),
+      x = "Population",
+      y = "Language",
+      color = "Growth Status"
+    ) +
+    scale_color_manual(values = c("Growing" = "seagreen", "Decreasing" = "tomato3")) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 18 * font_scale, face = "bold"),
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(size = 14 * font_scale, color = "darkgreen"),
+      axis.title.x = element_text(size = 16 * font_scale, color = "purple"),
+      axis.title.y = element_text(size = 16 * font_scale, color = "brown"),
+      legend.title = element_text(size = 14 * font_scale),
+      legend.text = element_text(size = 12 * font_scale)
+    )
+
+  # Возвращаем результат
+  list(table = table_html, plot = plot)
+}
+
+results <- analyze_language_trends(tulos, 2014, 2024, 15, font_scale = 1.3)
+
+results$table
+results$plot
 
 
 # fig (50,50)
