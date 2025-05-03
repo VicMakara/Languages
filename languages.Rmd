@@ -189,7 +189,7 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
     kable_classic_2("striped", full_width = TRUE) %>%
     row_spec(0, bold = TRUE, color = "white", italic = TRUE, background = "#D7261E") %>%
     column_spec(1, bold = TRUE, color = "white", background = "#D7261E") %>%
-    row_spec(ukr, bold = TRUE, italic = TRUE, angle = -10, color = "#210236", background = "#c6f7e5") %>%
+    row_spec(ukr, bold = TRUE, italic = TRUE, angle = -5, color = "#210236", background = "#c6f7e5") %>%
     kable_styling(bootstrap_options = c("striped", "hover"))
 
   # Подготовка данных для графика
