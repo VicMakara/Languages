@@ -123,7 +123,7 @@ DT::datatable(
 # read_tsv(readClipboard(),skip=4)
 # selection<-read_tsv(readClipboard(),skip=4)
 ```
-```{r graph_path, echo=FALSE, warning=FALSE, fig.dim = c(15, 15)}
+```{r graph_path, echo=FALSE, warning=FALSE, fig.dim = c(22, 15)}
 # knitr::knit2html('languages.Rmd', stylesheet = 'flat-table.css')
 # start <- 1990
 library(dplyr)
@@ -275,6 +275,126 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
   # Возвращаем результат
   list(table = table_html, plot = plot)
 }
+
+#' Analyze and visualize language population trends over multiple periods
+#'
+#' @param data Data frame in tulos format.
+#' @param periods List of year pairs (e.g. list(c(1994, 2004), c(2004, 2014)))
+#' @param top_n Number of top languages per period to consider
+#' @param font_scale Multiplier to scale all text sizes (default = 1)
+#' @return ggplot object with faceted arrow plot
+analyze_series <- function(data, periods, top_n = 15, font_scale = 1) {
+  library(dplyr)
+  library(ggplot2)
+  library(forcats)
+  library(grid)
+
+  arrow_data_all <- purrr::map_dfr(periods, function(years) {
+    start <- years[1]
+    end <- years[2]
+
+    top_langs <- data %>%
+      filter(Year %in% c(start, end)) %>%
+      filter(Rank <= top_n) %>%
+      pull(Language) %>%
+      unique()
+
+    arrow_data <- data %>%
+      filter(Language %in% top_langs, Year %in% c(start, end)) %>%
+      select(Language, Year, `Population 31 Dec`) %>%
+      group_by(Language) %>%
+      summarize(
+        start_year = start,
+        end_year = end,
+        start_pop = `Population 31 Dec`[Year == start],
+        end_pop = `Population 31 Dec`[Year == end],
+        .groups = "drop"
+      ) %>%
+      mutate(
+        pop_diff = end_pop - start_pop,
+        label = paste0("\u0394", pop_diff),
+        growth_status = ifelse(pop_diff >= 0, "Growing", "Decreasing"),
+        start_pop_zero = 0,
+        end_pop_adjusted = pop_diff,
+        Period = paste0(start, "–", end)
+      )
+
+    arrow_data
+  })
+
+  p <- ggplot(arrow_data_all) +
+    geom_segment(
+      aes(
+        x = start_pop_zero, xend = end_pop_adjusted,
+        y = reorder(Language, pop_diff), yend = reorder(Language, pop_diff),
+        color = growth_status
+      ),
+      arrow = arrow(length = unit(3, "mm"), type = "closed"),
+      size = 1
+    ) +
+    geom_text(
+      aes(
+        x = (start_pop_zero + end_pop_adjusted) / 2,
+        y = reorder(Language, pop_diff),
+        label = label
+      ),
+      vjust = -0.5,
+      size = 5 * font_scale,
+      family = "Bookman",
+      color = "blue"
+    ) +
+    geom_text(
+      aes(
+        x = start_pop_zero,
+        y = reorder(Language, pop_diff),
+        label = start_pop
+      ),
+      vjust = 1.5,
+      size = 3.5 * font_scale,
+      family = "Bookman",
+      color = "springgreen4"
+    ) +
+    geom_text(
+      aes(
+        x = end_pop_adjusted,
+        y = reorder(Language, pop_diff),
+        label = end_pop
+      ),
+      vjust = -1.7,
+      hjust = 0,
+      size = 3.5 * font_scale,
+      family = "Bookman",
+      color = "orangered3"
+    ) +
+    facet_wrap(~Period, scales = "free_y") +
+    labs(
+      title = paste("Language Population Trends across", length(periods), "Periods"),
+      x = "Population Change",
+      y = "Language",
+      color = "Growth"
+    ) +
+    scale_color_manual(values = c("Growing" = "seagreen", "Decreasing" = "tomato3")) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(size = 12 * font_scale),
+      axis.title.x = element_text(size = 14 * font_scale),
+      axis.title.y = element_text(size = 14 * font_scale),
+      legend.title = element_text(size = 12 * font_scale),
+      legend.text = element_text(size = 10 * font_scale),
+      strip.text = element_text(size = 13 * font_scale, face = "bold")
+    )
+
+  return(p)
+}
+
+analyze_series(
+  data = tulos,
+  periods = list(c(1994, 2004), c(2004, 2014), c(2014, 2024)),
+  top_n = 10,
+  font_scale = 1.2
+)
+
 
 results <- analyze_language_trends(tulos, 2014, 2024, 15, font_scale = 1.3)
 
