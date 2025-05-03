@@ -123,7 +123,7 @@ DT::datatable(
 # read_tsv(readClipboard(),skip=4)
 # selection<-read_tsv(readClipboard(),skip=4)
 ```
-```{r graph_path, echo=FALSE, warning=FALSE, fig.dim = c(22, 15)}
+```{r graph_path, echo=FALSE, warning=FALSE, fig.dim = c(20, 15)}
 # knitr::knit2html('languages.Rmd', stylesheet = 'flat-table.css')
 # start <- 1990
 library(dplyr)
@@ -134,14 +134,13 @@ library(kableExtra)
 library(ggplot2)
 library(scales)
 
-analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, font_scale = 1) {
+analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, text_size = 1) {
   library(dplyr)
   library(forcats)
   library(stringr)
   library(kableExtra)
   library(ggplot2)
 
-  # Определяем топ-языки по началу и концу периода
   language_start <- tulos %>% 
     ungroup() %>% 
     filter(Year == start_year & Rank <= rank_limit) %>% 
@@ -154,7 +153,6 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
 
   languages_most <- unique(bind_rows(language_start, language_end))
 
-  # Данные для таблицы и графика
   data_most <- tulos %>% 
     select(Year, Language, `Population 31 Dec`, Rank) %>% 
     filter(Language %in% pull(languages_most) & Year %in% c(start_year, end_year)) %>% 
@@ -164,7 +162,6 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
            pop_label = 1000 * round(`Population 31 Dec`/1000, 1)) %>% 
     arrange(Year, desc(Rank))
 
-  # Формируем таблицу
   table <- data_most %>% 
     select(-pop_label) %>% 
     rename(Population = `Population 31 Dec`) %>% 
@@ -176,10 +173,8 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
            `Change in pop` = .[[5]] - .[[4]]) %>% 
     arrange(.[[3]])
 
-  # Выделяем строку Ukrainian для особого оформления
   ukr <- which(table$Language == "Ukrainian")
 
-  # Оформление таблицы
   table_html <- kbl(
     table, escape = FALSE, format = "html",
     col.names = gsub("_", " ", names(table)),
@@ -192,7 +187,6 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
     row_spec(ukr, bold = TRUE, italic = TRUE, angle = -5, color = "#210236", background = "#c6f7e5") %>%
     kable_styling(bootstrap_options = c("striped", "hover"))
 
-  # Подготовка данных для графика
   arrow_data <- data_most %>%
     group_by(Language) %>%
     summarize(
@@ -209,7 +203,6 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
       end_pop_adjusted = end_pop - start_pop
     )
 
-  # График
   plot <- ggplot(arrow_data) +
     geom_segment(
       aes(
@@ -227,7 +220,7 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
         label = label
       ),
       vjust = -0.5,
-      size = 5 * font_scale,
+      size = 5 * text_size,
       family = "Bookman",
       color = "blue"
     ) +
@@ -238,7 +231,7 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
         label = start_pop
       ),
       vjust = 1.5,
-      size = 3.5 * font_scale,
+      size = 3.5 * text_size,
       family = "Bookman",
       color = "springgreen4"
     ) +
@@ -250,7 +243,7 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
       ),
       vjust = -1.7,
       hjust = 0,
-      size = 3.5 * font_scale,
+      size = 3.5 * text_size,
       family = "Bookman",
       color = "orangered3"
     ) +
@@ -263,16 +256,15 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
     scale_color_manual(values = c("Growing" = "seagreen", "Decreasing" = "tomato3")) +
     theme_minimal() +
     theme(
-      plot.title = element_text(size = 18 * font_scale, face = "bold"),
+      plot.title = element_text(size = 18 * text_size, face = "bold"),
       axis.text.x = element_blank(),
-      axis.text.y = element_text(size = 14 * font_scale, color = "darkgreen"),
-      axis.title.x = element_text(size = 16 * font_scale, color = "purple"),
-      axis.title.y = element_text(size = 16 * font_scale, color = "brown"),
-      legend.title = element_text(size = 14 * font_scale),
-      legend.text = element_text(size = 12 * font_scale)
+      axis.text.y = element_text(size = 14 * text_size, color = "darkgreen"),
+      axis.title.x = element_text(size = 16 * text_size, color = "purple"),
+      axis.title.y = element_text(size = 16 * text_size, color = "brown"),
+      legend.title = element_text(size = 14 * text_size),
+      legend.text = element_text(size = 12 * text_size)
     )
 
-  # Возвращаем результат
   list(table = table_html, plot = plot)
 }
 
@@ -283,50 +275,52 @@ analyze_language_trends <- function(tulos, start_year, end_year, rank_limit, fon
 #' @param top_n Number of top languages per period to consider
 #' @param font_scale Multiplier to scale all text sizes (default = 1)
 #' @return ggplot object with faceted arrow plot
-analyze_series <- function(data, periods, top_n = 15, font_scale = 1) {
+analyze_series <- function(df, breaks = c(1994, 2004, 2014, 2024), rank = 15,
+                             label_size = 4, text_offset = 1.5, base_font_size = 10) {
+  
   library(dplyr)
   library(ggplot2)
   library(forcats)
-  library(grid)
+  library(scales)
 
-  arrow_data_all <- purrr::map_dfr(periods, function(years) {
-    start <- years[1]
-    end <- years[2]
+  # Определяем интервалы
+  intervals <- data.frame(
+    start = head(breaks, -1),
+    end = tail(breaks, -1)
+  )
 
-    top_langs <- data %>%
-      filter(Year %in% c(start, end)) %>%
-      filter(Rank <= top_n) %>%
-      pull(Language) %>%
-      unique()
+  plot_data <- purrr::map2_dfr(intervals$start, intervals$end, function(start, end) {
+    language_start <- df %>% filter(Year == start & Rank <= rank) %>% select(Language)
+    language_end <- df %>% filter(Year == end & Rank <= rank) %>% select(Language)
+    languages_most <- unique(dplyr::bind_rows(language_start, language_end))
 
-    arrow_data <- data %>%
-      filter(Language %in% top_langs, Year %in% c(start, end)) %>%
+    df %>%
+      filter(Year %in% c(start, end), Language %in% languages_most$Language) %>%
       select(Language, Year, `Population 31 Dec`) %>%
+      arrange(Language, Year) %>%
       group_by(Language) %>%
+      mutate(period = paste0(start, "–", end)) %>%
       summarize(
-        start_year = start,
-        end_year = end,
-        start_pop = `Population 31 Dec`[Year == start],
-        end_pop = `Population 31 Dec`[Year == end],
+        start_pop = first(`Population 31 Dec`),
+        end_pop = last(`Population 31 Dec`),
+        diff = end_pop - start_pop,
         .groups = "drop"
       ) %>%
       mutate(
-        pop_diff = end_pop - start_pop,
-        label = paste0("\u0394", pop_diff),
-        growth_status = ifelse(pop_diff >= 0, "Growing", "Decreasing"),
+        label = paste0("Δ", diff),
+        growth_status = ifelse(diff >= 0, "Growing", "Decreasing"),
         start_pop_zero = 0,
-        end_pop_adjusted = pop_diff,
-        Period = paste0(start, "–", end)
+        end_pop_adjusted = end_pop - start_pop,
+        period = paste0(start, "–", end)
       )
-
-    arrow_data
   })
 
-  p <- ggplot(arrow_data_all) +
+  # Создаём график
+  ggplot(plot_data) +
     geom_segment(
       aes(
         x = start_pop_zero, xend = end_pop_adjusted,
-        y = reorder(Language, pop_diff), yend = reorder(Language, pop_diff),
+        y = reorder(Language, diff), yend = reorder(Language, diff),
         color = growth_status
       ),
       arrow = arrow(length = unit(3, "mm"), type = "closed"),
@@ -335,71 +329,115 @@ analyze_series <- function(data, periods, top_n = 15, font_scale = 1) {
     geom_text(
       aes(
         x = (start_pop_zero + end_pop_adjusted) / 2,
-        y = reorder(Language, pop_diff),
+        y = reorder(Language, diff),
         label = label
       ),
-      vjust = -0.5,
-      size = 5 * font_scale,
+      vjust = -text_offset,
+      size = label_size,
       family = "Bookman",
       color = "blue"
     ) +
     geom_text(
       aes(
         x = start_pop_zero,
-        y = reorder(Language, pop_diff),
+        y = reorder(Language, diff),
         label = start_pop
       ),
-      vjust = 1.5,
-      size = 3.5 * font_scale,
+      vjust = 1.2,
+      size = label_size * 0.85,
       family = "Bookman",
       color = "springgreen4"
     ) +
     geom_text(
       aes(
         x = end_pop_adjusted,
-        y = reorder(Language, pop_diff),
+        y = reorder(Language, diff),
         label = end_pop
       ),
       vjust = -1.7,
       hjust = 0,
-      size = 3.5 * font_scale,
+      size = label_size * 0.85,
       family = "Bookman",
       color = "orangered3"
     ) +
-    facet_wrap(~Period, scales = "free_y") +
+    facet_wrap(~period, ncol = 1) +  # вертикальное размещение
     labs(
-      title = paste("Language Population Trends across", length(periods), "Periods"),
+      title = paste("Language Population Trends across", nrow(intervals), "Periods"),
       x = "Population Change",
       y = "Language",
-      color = "Growth"
+      color = "Growth Status"
     ) +
     scale_color_manual(values = c("Growing" = "seagreen", "Decreasing" = "tomato3")) +
-    theme_minimal() +
+    theme_minimal(base_size = base_font_size) +
     theme(
       axis.text.x = element_blank(),
-      axis.text.y = element_text(size = 12 * font_scale),
-      axis.title.x = element_text(size = 14 * font_scale),
-      axis.title.y = element_text(size = 14 * font_scale),
-      legend.title = element_text(size = 12 * font_scale),
-      legend.text = element_text(size = 10 * font_scale),
-      strip.text = element_text(size = 13 * font_scale, face = "bold")
+      axis.text.y = element_text(size = base_font_size * 1.1, color = "darkgreen"),
+      axis.title.x = element_text(size = base_font_size * 1.2, color = "purple"),
+      axis.title.y = element_text(size = base_font_size * 1.2, color = "brown"),
+      legend.title = element_text(size = base_font_size * 1.1),
+      legend.text = element_text(size = base_font_size * 0.95)
     )
-
-  return(p)
 }
 
-analyze_series(
-  data = tulos,
-  periods = list(c(1994, 2004), c(2004, 2014), c(2014, 2024)),
-  top_n = 10,
-  font_scale = 1.2
+# Пример вызова:
+# analyze_series(tulos, breaks = c(1994, 2004, 2014, 2024), rank = 15, label_size = 3.8, base_font_size = 10)
+
+# analyze_series(
+#   data = tulos,
+#   periods = list(c(1994, 2004), c(2004, 2014), c(2014, 2024)),
+#   top_n = 10,
+#   font_scale = 1.2
+# )
+
+#  results <- analyze_language_trends(tulos, 1994, 2004, rank = 20, text_size = 4)
+# 
+# # analyze_language_trends(tulos, 2004, 2014, rank = 20, text_size = 4)
+# 
+# # results <- analyze_language_trends(tulos, 2014, 2024, 15, font_scale = 1.3)
+# 
+# results$table
+# results$plot
+# 
+# results <- analyze_language_trends(tulos, 2004, 2014, rank = 20, text_size = 4)
+# results$table
+# results$plot
+# 
+# 
+# results <- analyze_language_trends(tulos, 2014, 2024, rank = 20, text_size = 4)
+# results$table
+# results$plot
+
+# Настройки
+periods <- list(
+  c(1994, 2004),
+  c(2004, 2014),
+  c(2014, 2024)
 )
+rank_limit <- 15
+text_size <- 1.5
+# fig.dim <- c(20, 15)  # указать в chunk параметрах
+
+# Анализируем три периода
+results_list <- lapply(periods, function(p) {
+  analyze_language_trends(
+    tulos, start_year = p[1], end_year = p[2],
+    rank_limit = rank_limit, text_size = text_size
+  )
+})
+
+# Выводим таблицы
+results_list[[1]]$table
+results_list[[2]]$table
+results_list[[3]]$table
+
+# Выводим графики
+results_list[[1]]$plot
+results_list[[2]]$plot
+results_list[[3]]$plot
 
 
-results <- analyze_language_trends(tulos, 2014, 2024, 15, font_scale = 1.3)
 
-results$table
-results$plot
+
 
 
 # fig (50,50)
