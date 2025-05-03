@@ -1,0 +1,7 @@
+/* wide.css — подключается через YAML */
+body, .container, .main-container {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 1% !important;
+  padding-right: 1% !important;
+}
