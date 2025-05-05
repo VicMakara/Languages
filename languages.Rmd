@@ -50,10 +50,20 @@ tulos<-dplyr::left_join(tulos, qt,by = 'Year')
 tulos_frak <- tulos  %>%
   dplyr::mutate (koko = case_when(`Population 31 Dec` < quant95 ~ 0,
                                   `Population 31 Dec` >= quant95 ~ 1))
+# tulos_highlighted <- tulos %>%
+#   filter(Year %in% c(2024)) %>%
+#   slice(1:20) %>% 
+#   mutate(
+#     highlight = Rank <= 15
+#   )
+
 tulos_highlighted <- tulos %>%
   mutate(
     highlight = ifelse(Rank <= 15, TRUE, FALSE)
   )
+
+
+
 
 
 # tulos_frak<-tulos_frak %>% 
@@ -64,7 +74,7 @@ tulos_highlighted <- tulos %>%
 Top 15 languages (by population) → **black background** with **yellow text**.  
 Other languages → **white background** with **black text**.
 
-```{r datatable, echo=FALSE,warning=FALSE}
+```{r datatable, echo=FALSE,warning=FALSE, eval=FALSE}
 # knitr::kable(tulos,caption='Tekninen data' )
 # colors<-colors()[1:160]
 # color = grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
