@@ -29,8 +29,8 @@ library(randomcoloR)
  
 ```
 
-## Languages in Finland, 1990-2024
-### List of minority language spoken in Finland, years 1990-2024
+## Languages in Finland, 1990-2025
+### List of minority language spoken in Finland, years 1990-2025
 
 
 ``` {r Quantiles}
